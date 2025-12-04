@@ -40,6 +40,14 @@ struct Args {
     #[arg(long, default_value_t = false)]
     no_build: bool,
 
+    /// Comma separated list of features to activate.
+    #[arg(long, value_delimiter = ',')]
+    features: Vec<String>,
+
+    /// Do not activate the `default` feature.
+    #[arg(long, default_value_t = false)]
+    no_default_features: bool,
+
     /// Serialized arguments to the executable function.
     #[arg(long, value_delimiter = ',')]
     #[arg(long, conflicts_with_all = ["arguments_file", "profile_file"])]
@@ -102,11 +110,21 @@ fn main_inner(args: Args) -> Result<()> {
 
         if !args.no_build {
             let filter = PackagesFilter::generate_for::<Metadata>(vec![package.clone()].iter());
-            ScarbCommand::new()
-                .arg("build")
+            let mut cmd = ScarbCommand::new();
+            cmd.arg("build")
                 .env("SCARB_TARGET_KINDS", "lib")
-                .env("SCARB_PACKAGES_FILTER", filter.to_env())
-                .run()?;
+                .env("SCARB_PACKAGES_FILTER", filter.to_env());
+
+            if args.no_default_features {
+                cmd.arg("--no-default-features");
+            }
+
+            if !args.features.is_empty() {
+                cmd.arg("--features");
+                cmd.arg(args.features.join(","));
+            }
+
+            cmd.run()?;
         }
 
         let filename = format!("{}.sierra.json", package.name);

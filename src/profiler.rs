@@ -46,11 +46,12 @@ pub fn profile(
         )
     })?;
 
+    // Always provide gas for syscalls even if the program doesn't track gas
     let result = runner
         .run_function_with_starknet_context(
             entrypoint,
             vec![Arg::Array(program_args), Arg::Array(vec![])],
-            if gas_enabled { Some(usize::MAX) } else { None },
+            Some(usize::MAX),
             StarknetState::default(),
         )
         .with_context(|| "failed to run the function")?;
@@ -66,23 +67,23 @@ pub fn profile(
 
     let profiling_processor = ProfilingInfoProcessor::new(
         None,
-        sierra_program.program,
+        &sierra_program.program,
         Default::default(),
-        ProfilingInfoProcessorParams {
-            min_weight: 1,
-            process_by_statement: false,
-            process_by_concrete_libfunc: false,
-            process_by_generic_libfunc: false,
-            process_by_user_function: false,
-            process_by_original_user_function: false,
-            process_by_cairo_function: false,
-            process_by_stack_trace: false,
-            process_by_cairo_stack_trace: false,
-            process_by_scoped_statement: true,
-        },
     );
+    let params = ProfilingInfoProcessorParams {
+        min_weight: 1,
+        process_by_statement: false,
+        process_by_concrete_libfunc: false,
+        process_by_generic_libfunc: false,
+        process_by_user_function: false,
+        process_by_original_user_function: false,
+        process_by_cairo_function: false,
+        process_by_stack_trace: false,
+        process_by_cairo_stack_trace: false,
+        process_by_scoped_statement: true,
+    };
     let mut processed_profiling_info =
-        profiling_processor.process(result.profiling_info.as_ref().unwrap());
+        profiling_processor.process(result.profiling_info.as_ref().unwrap(), &params);
 
     // Adjust weights according to the builtins/libfuncs table
     if let Some(scoped_sierra_statement_weights) = processed_profiling_info
